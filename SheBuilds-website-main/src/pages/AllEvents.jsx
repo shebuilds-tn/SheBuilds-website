@@ -1,0 +1,102 @@
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Link, useLocation } from 'react-router'
+import EventsTimeline from '../sections/events/EventsTimeline.jsx'
+import { EventFilters, EventsEmpty } from '../sections/events/EventFilters.jsx'
+import { filtersFromSearch, filtersToSearch, useEventFilters } from '../sections/events/useEventFilters.js'
+import { getEvents } from '../sections/events/loadEvents.js'
+import { resultsAnnouncement, splitTimeline, yearId } from '../sections/events/eventTimeline.js'
+import { prefersReducedMotion } from '../siteSections.js'
+import usePageTitle from '../components/usePageTitle.js'
+
+// /events, rendered inside Layout (navbar and footer stay): every event on a timeline, upcoming
+// first, then past events by year. No element here uses a section id (#events etc.), so the
+// navbar treats this as "not the home page".
+export default function AllEvents() {
+  // One clock for both the loader's order and the upcoming/past split
+  const now = useMemo(() => new Date(), [])
+  const events = useMemo(() => getEvents(now), [now])
+  // ?city= / ?chapter= / ?tag= in the address apply on arrival (unknown values are ignored)
+  const { search } = useLocation()
+  const [initialFilters] = useState(() => filtersFromSearch(search))
+  const filters = useEventFilters(events, initialFilters)
+  const { filtered, selection, selectedTags } = filters
+  const { upcoming, past } = useMemo(() => splitTimeline(filtered, now), [filtered, now])
+
+  const pageRef = useRef(null)
+  const barRef = useRef(null)
+
+  // Arriving from the home page leaves us scrolled down; start at the top
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'instant' : 'auto' })
+  }, [])
+  usePageTitle('All events')
+
+  // Keep the address in step with the city/chapter and tags, replacing the current entry (no new
+  // history entry per click, no reload). The search text and any #year stay as they are.
+  useEffect(() => {
+    const next = filtersToSearch({ selection, selectedTags })
+    if (next === window.location.search) return
+    history.replaceState(history.state, '', `${window.location.pathname}${next}${window.location.hash}`)
+  }, [selection, selectedTags])
+
+  // The sticky filter bar's real height (it wraps on narrow screens), so year headings
+  // reached by a jump link land below it
+  useLayoutEffect(() => {
+    const bar = barRef.current
+    const page = pageRef.current
+    const publish = () => page.style.setProperty('--events-bar-h', `${bar.offsetHeight}px`)
+    publish()
+    const observer = new ResizeObserver(publish)
+    observer.observe(bar)
+    return () => observer.disconnect()
+  }, [])
+
+  // Scroll to a year without pushing history entries (like the navbar's section links)
+  const jumpTo = (e, year) => {
+    const el = document.getElementById(yearId(year))
+    if (!el) return
+    e.preventDefault()
+    el.scrollIntoView({ behavior: prefersReducedMotion() ? 'instant' : 'smooth', block: 'start' })
+    el.focus({ preventScroll: true })
+    history.replaceState(history.state, '', `#${yearId(year)}`)
+  }
+
+  return (
+    <section ref={pageRef} aria-labelledby="all-events-heading" className="events-page px-6 pt-8 pb-24 md:px-12 max-sm:px-4">
+      <Link
+        to={{ pathname: '/', hash: '#events' }}
+        className="inline-flex min-h-10 items-center gap-1.5 rounded-sm font-body font-bold text-ink no-underline underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+      >
+        <span aria-hidden="true">←</span> Back to events
+      </Link>
+
+      <h1 id="all-events-heading" className="about__heading">
+        All events
+      </h1>
+      {/* Screen readers only: announced when the filters change */}
+      <p aria-live="polite" className="sr-only">
+        {resultsAnnouncement(filtered.length)}
+      </p>
+
+      {/* Sticky just below the navbar; opaque, so the timeline scrolls underneath it */}
+      <div ref={barRef} className="events-page__bar">
+        <EventFilters {...filters} />
+        {past.length > 0 && (
+          <nav aria-label="Jump to year" className="events-page__years">
+            {past.map(({ year }) => (
+              <a key={year} href={`#${yearId(year)}`} onClick={(e) => jumpTo(e, year)} className="events-page__year">
+                {year}
+              </a>
+            ))}
+          </nav>
+        )}
+      </div>
+
+      {filtered.length > 0 ? (
+        <EventsTimeline upcoming={upcoming} past={past} />
+      ) : (
+        <EventsEmpty totalCount={events.length} {...filters} />
+      )}
+    </section>
+  )
+}
