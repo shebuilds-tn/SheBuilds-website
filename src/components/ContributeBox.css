@@ -1,5 +1,5 @@
-/* The "contribute" box (ContributeBox.jsx): by default the same colour as the "Join the community"
-   button (--color-accent), ink border and text, hard shadow. Stacks on phones, one row from md. */
+
+/* The "contribute" box (ContributeBox.jsx) */
 .contribute-box {
   display: flex;
   flex-direction: column;
@@ -13,13 +13,15 @@
   box-shadow: var(--shadow-brutal);
   color: var(--color-ink);
   font-family: var(--font-body);
+  box-sizing: border-box;
 }
 
-/* tone="teal": the navbar's active-pill teal (Blogs). Border, shadow and ink text stay. */
+/* Teal theme */
 .contribute-box--teal {
   background: var(--color-accent-alt);
 }
 
+/* Desktop layout */
 @media (width >= 48rem) {
   .contribute-box {
     flex-direction: row;
@@ -53,4 +55,31 @@
   align-items: center;
   gap: 0.5rem 1.25rem;
   min-width: 0;
+}
+
+/* Mobile: keep the button completely inside the contribute box */
+@media (width < 48rem) {
+  .contribute-box__actions {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .contribute-box__actions .blogs__pill {
+    display: flex;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    justify-content: center;
+    align-items: center;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
+
+  .contribute-box__actions .blogs__text-link {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
 }
